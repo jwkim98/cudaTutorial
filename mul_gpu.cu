@@ -65,21 +65,26 @@ class cudaMatrix{
        static void MatMul(float N, float *inA, float *inB, float *outC){
 
            float *g_inA, *g_inB, *g_outC;
+           cudaStream_t stream_0;
+           int size = N*N*sizeof(float);
 
-           cudaMalloc((void**)&g_inA, N*N*sizeof(float), cudaMemcpyHostToDevice);
-           cudaMalloc((void**)&g_inB, N*N*sizeof(float), cudaMemcpyHostToDevice);
-           cudaMalloc((void**)&g_outC, N*N*sizeof(float), cudaMemcpyHostToDevice);
+           cudaMalloc((void**)&g_inA, size);
+           cudaMalloc((void**)&g_inB, size);
+           cudaMalloc((void**)&g_outC, size);
            
-           cudaMemcpy(g_inA, inA, N*N*sizeof(float));
-           cudaMemcpy(g_inB, inB, N*N*sizeof(float));
+           cudaMemcpyAsync(g_inA, inA, size, cudaMemcpyHostToDevice, stream_0);
+           cudaMemcpyAsync(g_inB, inB, size, cudaMemcpyHostToDevice, stream_0);
            //cudaMemcpy(g_outC, outC, N*N*sizeof(float));
 
-           matmul<<<1,256>>>(inA, inB, outC, N);
+           dim3 threadsPerBlock(16,16);
+           dim3 numBlocks(N/16,N/16);
 
-           cudaMemcpy(outC, g_outC, N*N*sizeof(float), cudaMemcpyDeviceToHost);
-
+           matmul<<<numBlocks ,threadsPerBlock ,0 ,stream_0>>>(g_inA, g_inB, outC, N);
+           cudaMemcpyAsync(outC, g_outC, N*N*sizeof(float), cudaMemcpyDeviceToHosT, stream_0);
+           cudaStreamSynchronize(stream_0);
+           cudaFree(g_inA);
+           cudaFree(g_inB);
+           cudaFree(g_outC);
        }
-
-
 
 }
