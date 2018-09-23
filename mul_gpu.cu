@@ -1,7 +1,7 @@
 #include <iostream>
 #include <math>
 #include <stdlib.h>
-#define PAGE_SIZE = 1024*4
+#define PAGE_SIZE = 1024*4 // for x86 systems, page size is 4KB 
 
 class cudaMatrix{
 
