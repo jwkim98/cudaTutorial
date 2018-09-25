@@ -1,8 +1,10 @@
-#include <iostream>
-#include <math>
 #include <stdlib.h>
 #define PAGE_SIZE = 1024*4 // for x86 systems, page size is 4KB 
 
+#ifndef __GPU_LIB__
+#define __GPU_LIB__
+
+namespace cuda_lib{
 class cudaMatrix{
 
   private:
@@ -119,39 +121,11 @@ class cudaMatrix{
        }
 
   public:
-       static void MatMulAsync(float N, float *inA, float *inB, float *outC, cudaStream_t){
+       static void MatMulAsync(float N, float *inA, float *inB, float *outC, cudaStream_t stream);
 
-           float *g_inA, *g_inB, *g_outC; //device memory 
-           cudaStream_t stream_0;
-           int size = N*N*sizeof(float);
-
-           cudaMalloc((void**)&g_inA, size); //malloc on device (writes device memory address) 
-           cudaMalloc((void**)&g_inB, size);
-           cudaMalloc((void**)&g_outC, size);
-           
-           //Asynchronously copies memory from Host memory..
-           cudaMemcpyAsync(g_inA, inA, size, cudaMemcpyHostToDevice, stream_0);
-           cudaMemcpyAsync(g_inB, inB, size, cudaMemcpyHostToDevice, stream_0);
-           
-           //allocate 256 threads per block 
-           //Uses multiple blocks to maximize multi-threading performance
-           //these values can be differentiated by gpu architecture
-           dim3 threadsPerBlock(16,16);
-           dim3 numBlocks(N/16,N/16);
-
-           //Start kernel
-           matMul<<<numBlocks ,threadsPerBlock ,0 ,stream_0>>>(g_inA, g_inB, outC, N);
-           cudaMemcpyAsync(outC, g_outC, size, cudaMemcpyDeviceToHosT, stream_0);
-           cudaStreamSynchronize(stream_0);//wait until processes on streak_0 is finished
-
-           //Free malloced resources on gpu
-           cudaFree(g_inA);
-           cudaFree(g_inB);
-           cudaFree(g_outC);
-       }
-
-       static void MatMulAsyncUnified(float N, float *inA, float *inB, float *outC){
-          
-       }
+       static void MatMulAsyncUnified(float N, float *inA, float *inB, float *outC);
+       
 
 }
+}
+#endif
