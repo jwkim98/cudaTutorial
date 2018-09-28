@@ -6,7 +6,36 @@
 #include <functional>
 #include <iostream>
 
+using namespace std;
+
 namespace cuda_lib{
+    template <typename T>
+    class Matrix{
+      private:
+            T* A;
+            int sizeX;
+            int sizeY;
+            int sizeZ;
+            int total_size;
+      public:
+//            template <typename T>
+            Matrix(T* A, int x, int y = 0, int z = 0){
+                sizeX = x;
+                sizeY = y;
+                sizeZ = z;
+            }
+            Matrix(Matrix &matrix){
+                for(int i=0; i < matrix.total_size; i++){
+                    A[i] = matrix.A[i];
+                }
+                sizeX = matrix.sizeX;
+                sizeY = matrix.sizeY;
+                sizeZ = matrix.sizeZ;
+            }
+
+    };
+
+
     class cudaMatrix{
 
       private:
@@ -33,13 +62,26 @@ namespace cuda_lib{
             void MatTranspose(int M, int N, data_type* A, data_type* B);
 
       public:
-            cudaMatrix(){
-                std::cout<<"cudaMatrix Initialized"<<std::endl;
-            }
+            cudaMatrix();
 
-            void MatMulAsync(float N, float *inA, float *inB, float *outC, cudaStream_t stream); 
+            cudaMatrix(int devicenum);
 
+            void MatMulAsync(float N, float *inA, float *inB, float *outC, cudaStream_t stream);
     };
+
+    cudaMatrix::cudaMatrix(){
+        cudaDeviceProp* prop = NULL;
+        int* device = NULL;
+        cudaGetDevice(device);
+        cudaGetDeviceProperties(prop, *device);
+        cout<< "Device Name:"<< prop->name << endl << "Total memory:"<< prop->totalGlobalMem << endl;
+    }
+
+    cudaMatrix::cudaMatrix(int devicenum){
+        cudaDeviceProp* prop = NULL;
+        cudaGetDeviceProperties(prop, devicenum);
+        cout<< "Device Name:"<< prop->name << endl <<"Total memory:" << prop->totalGlobalMem << endl;
+    }
 
 
     __global__ void matMul(float* A, float* B, float* C, int N);
