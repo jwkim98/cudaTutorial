@@ -137,4 +137,7 @@ class cudaMatrix{
            cudaMemcpy(outC, g_outC, M*N*sizeof(float), cudaMemcpyDeviceToHost);
        }
 
+       static void MatTranspose(){
+
+       }
 }
