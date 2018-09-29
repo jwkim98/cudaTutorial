@@ -1,3 +1,7 @@
+/*
+   gpu_lib.cuh
+*/
+
 #ifndef __GPU_LIB__
 #define __GPU_LIB__
 
@@ -30,16 +34,16 @@ namespace cuda_lib{
     class Matrix
     {
       private:
-            T* A;//data storing actual matrix
             uint32_t sizeX;
             uint32_t sizeY;
             uint32_t total_size;
       public:
-            Matrix(T* A, uint32_t x, uint32_t y = 0): sizeX(x), sizeY(y)
+            T *A; //data storing actual matrix
+            Matrix(T* A, uint32_t x, uint32_t y = 1): sizeX(x), sizeY(y)
             {
                 if(x == 0)
                     throw cudaException("x cannot be 0");                
-                if(y! = 0)
+                if(y != 0)
                     total_size = x*y;
                 else
                     total_size = x;
@@ -53,21 +57,61 @@ namespace cuda_lib{
                 memcpy(A, matrix.A, total_size); // do deep copy
             }
 
-            Matrix &operator= (const Matrix &matrix)
-            {
-                sizeX = matrix.sizeX;
-                sizeY = matrix.sizeY;
-                total_size = matrix.total_size;
-                A = new T[total_size];
-                memcpy(A, matrix.A, total_size); // do deep copy
-            }
+            Matrix& operator=(const Matrix &matrix);
+
+            Matrix operator+(const Matrix &matrix);
+
+            Matrix operator-(const Matrix &matrix);
+
+            Matrix operator*(const Matrix &matrix);
+
+            Matrix operator*(int mul);
+
+            friend Matrix operator*(int mul, const Matrix &matrix);
+
+            Matrix accumulate(function<T(T)> fc);
+
+            Matrix& operator+=(const Matrix &matrix);
+
+            Matrix& operator-=(const Matrix &matrix);
+
+            Matrix dot(const Matrix &matrix);
+
+            Matrix& Transpose();
 
             ~Matrix()
             {
                 delete[] A; //free allocated array of T
             }
 
+            int sizeX(){
+                return sizeX;
+            }
+
+            int sizeY(){
+                return sizeY;
+            }
+
+            Matrix& reshape();
+
     };
+
+        template <typename T>
+        Matrix<T>& Matrix<T>::operator=(const Matrix<T> &matrix)
+        {
+            sizeX = matrix.sizeX;
+            sizeY = matrix.sizeY;
+            total_size = matrix.total_size;
+            A = new T[total_size];
+            memcpy(A, matrix.A, total_size); // do deep copy
+            return *this;
+        }
+
+        template <typename T>
+        Matrix<T>& Matrix<T>::operator+(const Matrix<T> &matrix){
+            
+        }
+
 
 
     class cudaMatrix{
@@ -88,7 +132,7 @@ namespace cuda_lib{
             void MatOp(int M ,int N ,data_type *input ,data_type* output ,std::function<data_type (data_type)> accumulate);
 
             template <typename data_type>
-            void MatAdd(int N, data_type *A, data_type *B, data_type *C);
+            void MatAdd(int M, int N, int total_Size, data_type* A, data_type* B, data_type *C, cudaStream_t stream);
             
             template <typename data_type>
             void MatDot(int N, data_type* A, data_type* B, data_type* C);
@@ -101,7 +145,7 @@ namespace cuda_lib{
 
             cudaMatrix(int devicenum);
 
-            void MatMulAsync(float N, float *inA, float *inB, float *outC, cudaStream_t stream);
+            void MatMulAsync(int N, float *inA, float *inB, float *outC, cudaStream_t stream);
     };
 
     cudaMatrix::cudaMatrix(){
@@ -132,7 +176,7 @@ namespace cuda_lib{
     __global__ void matOp(int M ,int N ,data_type *input ,data_type* output ,std::function<data_type (data_type)> accumulate);
 
     template <typename data_type>
-    __global__ void matAdd(int N, data_type *A, data_type *B, data_type *C);
+    __global__ void matAdd(int M, int N, data_type *A, data_type *B, data_type *C);
     
     template <typename data_type>
     __global__ void matDot(int N, data_type* A, data_type* B, data_type* C);
@@ -141,11 +185,11 @@ namespace cuda_lib{
     __global__ void matTranspose(int M, int N, data_type* A, data_type* B);
 
 
-
-    void cudaMatrix::MatMul(int N, float* A, float* B, float* C){
+    template<typename data_type>
+    void cudaMatrix::MatMul(int N, data_type* A, data_type* B, data_type* C){
         dim3 block(32,32);
         dim3 grid(N/32+1, N/32+1);
-        matMul<<<grid,block>>>(A,B,C,N);
+        matMul<<<grid,block>>>(N,A,B,C);
     }
 
     template<typename data_type>
@@ -172,10 +216,25 @@ namespace cuda_lib{
     }
 
     template <typename data_type>
-    void cudaMatrix::MatAdd(int N, data_type *A, data_type *B, data_type *C){
+    void cudaMatrix::MatAdd(int M, int N, int total_Size, data_type* A, data_type* B, data_type *C, cudaStream_t stream){
+        data_type *g_A, *g_B, *g_out;
+        int size = sizeof(total_size);
+        cudaMalloc((void**)&g_A, size);
+        cudaMalloc((void**)&g_B, size);
+        cudaMalloc((void**)&g_out, size);
+
+        cudaMemcpyAsync(g_A, A, size, cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(g_B, B, size, cudaMemcpyHostToDevice, stream);
         dim3 block(32,32);
-        dim3 grid(N/32+1, N/32+1);
-        matAdd<<<grid,block>>>(N, A, B, C);
+        dim3 grid(M/32+1, N/32+1);
+        matAdd<<<grid,block,0,stream>>>(M, N, g_A, g_B, g_out);
+        cudaMemcpyAsync(C, g_out, size, cudaMemcpyDeviceToHost, stream);
+        cudaStreamSynchronize(stream);
+
+        cudaFree(g_A);
+        cudaFree(g_B);
+        cudaFree(g_out);
+
     }
     
     template <typename data_type>
